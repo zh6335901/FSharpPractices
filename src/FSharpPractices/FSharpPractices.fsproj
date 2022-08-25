@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="StackStack.fs" />
     <Compile Include="ReaderMonad.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
