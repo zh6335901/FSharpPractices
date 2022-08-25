@@ -49,7 +49,7 @@ module ReaderMonadSamples =
         
     [<Interface>] type IDb = abstract Database: IDatabase
 
-    type User = { Id: string; Password: string; nameof: string }
+    type User = { Id: string; Password: string; Name: string }
 
     module Db = 
         let fetchUser (userId: string) (env: #IDb): User = env.Database.Query("test", {| userId = userId |})
