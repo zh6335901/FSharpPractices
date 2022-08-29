@@ -183,4 +183,70 @@ type FiberBuilder =
 [<AutoOpen>]
 module FiberBuilder = 
     let fib = FiberBuilder()
-                
+
+[<RequireQualifiedAccess>]
+module Scheduler = 
+    let shard = {
+        new IScheduler with
+        member _.Schedule fn = ThreadPool.QueueUserWorkItem(WaitCallback (ignore >> fn)) |> ignore
+        member _.Delay (timeout: TimeSpan, fn) = 
+            let mutable t = Unchecked.defaultof<Timer>
+            let callback = fun _ ->
+                t.Dispose()
+                fn()
+                ()
+            t <- new Timer(callback, null, int timeout.TotalMilliseconds, Timeout.Infinite)
+    }
+
+    type TestScheduler(now: DateTime) = 
+        let mutable running = false
+        let mutable currentTime = now.Ticks
+        let mutable timeline = Map.empty
+
+        let schedule delay fn = 
+            let at = currentTime + delay
+            timeline <-
+                match Map.tryFind at timeline with
+                | None -> Map.add at [fn] timeline
+                | Some fns -> Map.add at (fn :: fns) timeline
+
+        let rec run () = 
+            match Seq.tryHead timeline with
+            | None -> running <- false
+            | Some (KeyValue(time, bucket)) ->
+                timeline <- Map.remove time timeline
+                currentTime <- time
+                for fn in List.rev bucket do
+                    fn ()
+                run ()
+        
+        member _.UtcNow () = DateTime(currentTime)
+
+        interface IScheduler with
+            member _.Schedule fn = 
+                schedule 0L fn
+                if not running then
+                    running <- true
+                    run ()
+
+            member _.Delay (timeout: TimeSpan, fn) = schedule timeout.Ticks fn
+
+    let test (cancel, fiber) = 
+        let s = TestScheduler(DateTime.UtcNow)
+        Fiber.blocking s cancel fiber
+
+module FiberSamples = 
+    let inline millis n = TimeSpan.FromMilliseconds (float n)
+    let run () = 
+        let program = fib {
+            let a = fib { 
+                do! Fiber.delay (millis 5000)
+                return 3
+            }
+            let! b = a |> Fiber.timeout (millis 3000)
+            return b
+        }
+
+        let cancel = Cancel()
+        let result = Scheduler.test(cancel, program)
+        printfn "Result: %A" result
