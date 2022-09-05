@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ThreadPool.fs" />
     <Compile Include="Actor.fs" />
     <Compile Include="Fiber.fs" />
     <Compile Include="StackStack.fs" />
